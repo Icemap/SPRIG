@@ -1,7 +1,5 @@
 # SPRIG Reproduction Guide
 
-[中文](./README-zh.md) | English
-
 This repository contains the experimental code and scripts for the SPRIG paper. The steps
 below reproduce all tables/figures in the main text and appendix (efficiency, ablations,
 significance tests, QA evaluation, etc.). CPU-only is assumed.
@@ -279,37 +277,9 @@ python3 scripts/run_efficiency.py --dataset 2wikimultihopqa --split validation \
 python3 scripts/plot_efficiency.py
 ```
 
-Per-doc table (choose any output path). Set `SUMMARY_CSV` to the `all_results.csv` generated
-by `scripts/summarize_results.py`:
+Per-doc table (choose any output path):
 ```bash
-export SUMMARY_CSV="<path>"
-export EFF_TABLE_PATH="<path>"
-
-python3 - <<'PY'
-import os
-import pandas as pd
-from pathlib import Path
-df = pd.read_csv(os.environ["SUMMARY_CSV"])
-df = df[df["tag"] == "eff2"]
-rows = []
-for dataset in sorted(df["dataset"].dropna().unique()):
-    for method in ["bm25", "dense", "graph", "graph_dense"]:
-        sub = df[(df["dataset"] == dataset) & (df["method"] == method)]
-        if sub.empty:
-            continue
-        per_doc = (sub["index_time_sec"] / sub["docs"]) * 1000.0
-        rows.append((dataset, method, per_doc.median(), per_doc.min(), per_doc.max()))
-out = Path(os.environ["EFF_TABLE_PATH"])
-out.parent.mkdir(parents=True, exist_ok=True)
-with out.open("w", encoding="utf-8") as f:
-    f.write("\\\\begin{tabular}{llrr}\\n")
-    f.write("Dataset & Method & Median ms/doc & Min--Max ms/doc \\\\\\\\ \\n")
-    f.write("\\\\hline\\n")
-    for dataset, method, med, lo, hi in rows:
-        f.write(f"{dataset} & {method} & {med:.3f} & [{lo:.3f}, {hi:.3f}] \\\\\\\\ \\n")
-    f.write("\\\\end{tabular}\\n")
-print(f\"Wrote {out}\")
-PY
+python3 scripts/efficiency_per_doc.py --summary-csv <path> --tag eff2 --output <path>
 ```
 
 ## 8. Ablations
@@ -363,28 +333,7 @@ python3 scripts/run_term_graph_ablation.py --dataset 2wikimultihopqa --split val
 ### 8.3 Ablation Top-10 tables
 `run_ablation.py` writes `ablation_top10.json`; convert to LaTeX:
 ```bash
-export ABLATION_TEX_DIR="<path>"
-
-python3 - <<'PY'
-import os
-import json
-from pathlib import Path
-def to_tex(path, out):
-    data = json.loads(Path(path).read_text(encoding="utf-8"))
-    rows = ["\\\\begin{tabular}{lrrrr}", "Method & R@1 & R@5 & R@10 & MRR \\\\\\\\ ", "\\\\hline"]
-    for r in data:
-        rows.append(
-            f"{r.get('method','graph_dense')} & {float(r.get('recall@1',0)):.3f} "
-            f"& {float(r.get('recall@5',0)):.3f} & {float(r.get('recall@10',0)):.3f} "
-            f"& {float(r.get('mrr',0)):.3f} \\\\\\\\ "
-        )
-    rows.append("\\\\end{tabular}")
-    Path(out).write_text("\\n".join(rows), encoding="utf-8")
-out_dir = Path(os.environ["ABLATION_TEX_DIR"])
-out_dir.mkdir(parents=True, exist_ok=True)
-to_tex(Path(os.environ["ABLATION_HOTPOT_DIR"]) / "ablation_top10.json", out_dir / "ablation_hotpotqa_top10.tex")
-to_tex(Path(os.environ["ABLATION_TWOWIKI_DIR"]) / "ablation_top10.json", out_dir / "ablation_2wikimultihopqa_top10.tex")
-PY
+python3 scripts/export_ablation_top10.py --input <path> --output <path>
 ```
 
 ## 9. Dense Seeding / ANN / Model Sensitivity
@@ -495,13 +444,12 @@ GraphHybrid comparison on full and q1000:
 - +MIX: `--graph-seed-mix-mode auto`
 - +ALL: all three combined
 
-Choose output locations for enhancement runs and the summary table:
+Choose output locations for enhancement runs:
 ```bash
 export HOTPOT_ENH_BASE_DIR="<path>"
 export HOTPOT_ENH_ALL_DIR="<path>"
 export TWOWIKI_ENH_BASE_DIR="<path>"
 export TWOWIKI_ENH_ALL_DIR="<path>"
-export ENH_TABLE_PATH="<path>"
 ```
 
 Example (HotpotQA, full):
@@ -529,70 +477,22 @@ Other variants are produced by adding `--graph-use-aliases` / `--graph-hub-top-r
 Section 3.2 (e.g., `--graph-entity-normalize lower`, `--graph-seed-docs-k 3`, `--graph-seed-docs-k-bm25 5`).
 q1000 is the same with `--max-samples 1000`.
 
-Summarize GraphHybrid R@10/QTime into the table path you choose:
+Summarize GraphHybrid R@10/QTime into a table:
 ```bash
-python3 - <<'PY'
-import json
-import os
-from pathlib import Path
-def row(run_dir, label):
-    data = json.loads(Path(run_dir, "metrics.json").read_text(encoding="utf-8"))
-    res = [r for r in data["results"] if r["method"] == "graph_hybrid"][0]
-    return label, res["metrics"]["recall_at_k"]["10"], res["query_time_sec"]
-
-rows_hotpot = [
-    row(os.environ["HOTPOT_ENH_BASE_DIR"], "Base"),
-    row(os.environ["HOTPOT_ENH_ALL_DIR"], "+ALL"),
-]
-rows_2wiki = [
-    row(os.environ["TWOWIKI_ENH_BASE_DIR"], "Base"),
-    row(os.environ["TWOWIKI_ENH_ALL_DIR"], "+ALL"),
-]
-
-out = Path(os.environ["ENH_TABLE_PATH"])
-out.parent.mkdir(parents=True, exist_ok=True)
-with out.open("w", encoding="utf-8") as f:
-    f.write("\\\\begin{tabular}{lrrrr}\\n")
-    f.write("Variant & Hotpot R@10 & Hotpot QTime (s) & 2Wiki R@10 & 2Wiki QTime (s) \\\\\\\\ \\n")
-    f.write("\\\\hline\\n")
-    for (label, r10_h, qt_h), (_, r10_w, qt_w) in zip(rows_hotpot, rows_2wiki):
-        f.write(f"{label} & {r10_h:.3f} & {qt_h:.1f} & {r10_w:.3f} & {qt_w:.1f} \\\\\\\\ \\n")
-    f.write("\\\\end{tabular}\\n")
-print(f\"Wrote {out}\")
-PY
+python3 scripts/summarize_graph_enhancements.py \
+  --hotpot-base <path> \
+  --hotpot-all <path> \
+  --twowiki-base <path> \
+  --twowiki-all <path> \
+  --output <path>
 ```
 
 ## 11. Robustness (w/o tune)
 
-The script below removes 500 tuning queries from full validation:
+The command below removes 500 tuning queries from full validation:
 ```bash
-python3 - <<'PY'
-import os
-import json, random
-from pathlib import Path
-from sprig.data.hotpotqa import load_hotpotqa
-from sprig.data.twowiki import load_twowiki
-from sprig.eval import evaluate
-
-def run(dataset, run_dir, max_samples, seed=42, tune_n=500):
-    if dataset == "hotpotqa":
-        docs, queries = load_hotpotqa(split="validation", max_samples=max_samples, seed=seed)
-    else:
-        docs, queries = load_twowiki(split="validation", max_samples=max_samples, seed=seed)
-    qids = [q.qid for q in queries]
-    random.seed(seed)
-    tune = set(random.sample(qids, min(tune_n, len(qids))))
-    gold = {q.qid: list(q.gold_titles) for q in queries if q.qid not in tune}
-    retrieved = json.loads(Path(run_dir, "retrieved.json").read_text(encoding="utf-8"))
-    metrics = {}
-    for method in ["bm25", "dense", "rrf", "graph_hybrid", "graph_dense"]:
-        m = evaluate(gold, retrieved.get(method, {}), ks=[10])
-        metrics[method] = {"recall@10": m.recall_at_k[10], "mrr": m.mrr}
-    return metrics
-
-hotpot = run("hotpotqa", os.environ["HOTPOT_MERGED_DIR"], 7405)
-twowiki = run("2wikimultihopqa", os.environ["TWOWIKI_MERGED_DIR"], 10000)
-print("hotpot", hotpot)
-print("2wiki", twowiki)
-PY
+python3 scripts/robustness_no_tune.py \
+  --hotpot-run <path> --hotpot-n 7405 \
+  --twowiki-run <path> --twowiki-n 10000 \
+  --output <path>
 ```
