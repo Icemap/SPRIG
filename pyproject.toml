@@ -1,0 +1,53 @@
+[project]
+name = "sprig"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "numpy>=1.26",
+  "scipy>=1.12",
+  "pandas>=2.2",
+  "spacy>=3.7",
+  "tqdm>=4.66",
+  "pip>=25.3",
+  "psutil>=7.2.0",
+]
+
+[project.optional-dependencies]
+vector = [
+  "sentence-transformers>=3.0",
+  "hnswlib>=0.8.0",
+]
+data = [
+  "datasets>=2.20",
+  "pyarrow>=16",
+]
+plot = [
+  "matplotlib>=3.9",
+]
+qa = [
+  "transformers>=4.45",
+  "torch>=2.3",
+]
+dev = [
+  "pytest>=8",
+  "ruff>=0.6",
+]
+
+[project.scripts]
+sprig = "sprig.cli:main"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"

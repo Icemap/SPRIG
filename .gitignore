@@ -1,0 +1,33 @@
+# OS files
+.DS_Store
+._*
+
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info/
+
+# Virtual environments
+.venv/
+
+# Manuscript (excluded from repo)
+paper/
+literature/
+
+# Data/artifacts/outputs
+data/
+artifacts/
+outputs/
+
+# Caches
+.cache/
+.hf-cache/
+.mpl-cache/
+.pytest_cache/
+.uv-cache/
+
+# Jupyter
+.ipynb_checkpoints/
